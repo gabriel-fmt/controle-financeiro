@@ -1,6 +1,6 @@
 "use server";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, createSupabaseServiceClient } from "@/lib/supabase/server";
 import { getAdminContext } from "@/lib/admin-auth";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -32,6 +32,27 @@ export async function logoutAction() {
   const supabase = await createSupabaseServerClient();
   await supabase?.auth.signOut();
   redirect("/admin/login");
+}
+
+export async function clearQuizResultsAction(formData: FormData) {
+  const parsed = z.literal("APAGAR TESTES").safeParse(formData.get("confirmation"));
+  if (!parsed.success) redirect("/admin?reset=invalid");
+
+  const { configured } = await getAdminContext();
+  if (!configured) redirect("/admin?reset=demo");
+
+  const serviceClient = createSupabaseServiceClient();
+  if (!serviceClient) redirect("/admin?reset=config");
+
+  const { count, error } = await serviceClient
+    .from("quiz_results")
+    .delete({ count: "exact" })
+    .not("id", "is", null);
+
+  if (error) redirect("/admin?reset=error");
+
+  revalidatePath("/admin");
+  redirect(`/admin?reset=success&deleted=${count ?? 0}`);
 }
 
 const questionSchema = z.object({

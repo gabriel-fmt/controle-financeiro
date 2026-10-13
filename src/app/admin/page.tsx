@@ -1,4 +1,5 @@
 import { logoutAction } from "@/app/admin/actions";
+import { ClearResultsForm } from "@/components/clear-results-form";
 import { getAdminContext } from "@/lib/admin-auth";
 import { participantKey } from "@/lib/participant";
 import { quizQuestions } from "@/quiz-config/questions";
@@ -25,6 +26,8 @@ type AdminSearchParams = Promise<{
   q?: string | string[];
   result?: string | string[];
   attempt?: string | string[];
+  reset?: string | string[];
+  deleted?: string | string[];
 }>;
 
 function firstParam(value: string | string[] | undefined) {
@@ -38,6 +41,8 @@ export default async function AdminPage({ searchParams }: { searchParams: AdminS
   const resultFilter = requestedResult === "verde" || requestedResult === "amarelo" || requestedResult === "vermelho" ? requestedResult : "todos";
   const requestedAttempt = firstParam(query.attempt);
   const attemptFilter = requestedAttempt === "todas" || requestedAttempt === "repeticoes" ? requestedAttempt : "primeira";
+  const resetStatus = firstParam(query.reset);
+  const deletedCount = Number.parseInt(firstParam(query.deleted) ?? "0", 10) || 0;
 
   const { configured, supabase, userEmail } = await getAdminContext();
   let rows = demoRows;
@@ -85,6 +90,8 @@ export default async function AdminPage({ searchParams }: { searchParams: AdminS
     </header>
     <section className="dashboard-content">
       {!configured && <div className="setup-banner"><CircleAlert size={20} /><div><b>Dados de demonstração</b><p>Configure o Supabase para proteger o painel e salvar participantes, respostas e alterações nas questões.</p></div></div>}
+      {resetStatus === "success" && <div className="success-banner"><CircleAlert size={18} /><span>{deletedCount} {deletedCount === 1 ? "participação removida" : "participações removidas"}. As questões foram mantidas.</span></div>}
+      {resetStatus && resetStatus !== "success" && <div className="question-error"><CircleAlert size={18} /><span>{resetStatus === "invalid" ? "Digite exatamente APAGAR TESTES para confirmar." : "Não foi possível limpar as participações. Tente novamente."}</span></div>}
       <div className="dashboard-title"><div><p className="admin-kicker"><BarChart3 size={16} /> Visão geral</p><h1>Resultados dos participantes</h1></div><Link className="manage-questions" href="/admin/questions"><Settings2 size={17} /> Gerenciar questões</Link></div>
       <section className="admin-filters" aria-labelledby="filter-title">
         <div className="filter-heading"><div><span className="filter-icon"><Filter size={18} /></span><div><h2 id="filter-title">Filtrar resultados</h2><p>A primeira tentativa válida aparece por padrão para facilitar a premiação.</p></div></div>{hasCustomFilters && <Link href="/admin" className="clear-filters"><X size={15} /> Limpar filtros</Link>}</div>
@@ -123,6 +130,7 @@ export default async function AdminPage({ searchParams }: { searchParams: AdminS
           return <tr key={row.id}><td className="participant-name"><span>{row.participant_first_name} {row.participant_last_name}</span><small>{attemptTotal} {attemptTotal === 1 ? "tentativa" : "tentativas"}{sharedDevice ? " · verificar aparelho" : ""}</small></td><td><span className={`attempt-tag ${row.attempt_number === 1 ? "valid" : "repeat"}`}>{row.attempt_number}ª de {attemptTotal}<small>{row.attempt_number === 1 ? "válida para premiação" : "repetição"}</small></span></td><td><span className={`status-tag ${row.result}`}>{row.result}</span></td><td><b>{row.score}/{row.max_score}</b></td><td>{row.green_count}</td><td>{row.yellow_count}</td><td>{row.red_count}</td><td>{Math.floor(row.duration_seconds / 60)}m {row.duration_seconds % 60}s</td></tr>;
         })}{filteredRows.length === 0 && <tr><td colSpan={8}><div className="empty-filter-state"><Search size={20} /><b>Nenhum resultado encontrado</b><span>Altere ou limpe os filtros para visualizar outras participações.</span></div></td></tr>}</tbody></table></div>
       </section>
+      {configured && <ClearResultsForm />}
     </section>
   </main>;
 }
